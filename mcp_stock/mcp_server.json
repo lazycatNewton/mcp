@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "mcp-stock": {
-      "command": "conda",
-      "args": ["run", "-n", "mcp_stock", "python", "-m", "mcp_stock"],
-      "cwd": "/Users/didiapp/dev/mcp/mcp_stock/mcp_stock"
-    }
-  }
-}
