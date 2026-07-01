@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "mcp-stock": {
+      "command": "uv",
+      "args": ["run", "--directory", "/Users/didiapp/dev/mcp/mcp_stock", "python", "-m", "mcp_stock"]
+    }
+  }
+}
