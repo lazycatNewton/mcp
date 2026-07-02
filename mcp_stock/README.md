@@ -89,3 +89,18 @@ Get fundamental data: PE, PB, market cap, dividend yield.
 ### `get_market_index` *(not yet implemented)*
 
 Get major market index data (SSE Composite, SZSE Component, CSI 300, etc.).
+
+### `get_limit_pool`
+
+Get EastMoney A-share limit-up and/or limit-down stock pools.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `date` | str | `""` | Trading date in `YYYYMMDD` format; empty uses today |
+| `pool` | str | `"both"` | `"up"`, `"down"`, or `"both"` |
+
+Returns a dict with `date`, `source`, `counts`, and `limit_up` / `limit_down` lists.
+Fields are normalized to English names such as `symbol`, `name`, `change_pct`,
+`latest_price`, `seal_fund`, `industry`, and consecutive limit counts. Each stock
+record also includes `is_st`, `is_new_stock`, and `listing_date`; `flags` describes
+the data source used for these labels.

@@ -209,6 +209,25 @@ tempCodeRunnerFile.py
 # PyPI configuration file
 .pypirc
 
+# AI assistant local state and prompts
+**/.claude/
+**/.codex/
+**/.agents/
+**/.cursor/
+**/.continue/
+**/.windsurf/
+**/.aider*
+**/AGENTS.md
+**/CLAUDE.md
+
+# Local editor/project metadata
+**/.idea/
+**/.vscode/
+
+# Local MCP runtime configuration
+**/.mcp.json
+**/mcp_server.json
+
 # Marimo
 marimo/_static/
 marimo/_lsp/
