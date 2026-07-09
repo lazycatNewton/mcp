@@ -5,6 +5,159 @@ from mcp_stock.tools import market
 
 
 @pytest.mark.asyncio
+async def test_get_stock_list_returns_sh_main_and_star_market(monkeypatch):
+    monkeypatch.setattr(market, "RATE_LIMIT_DELAY", 0)
+    calls = []
+
+    def stock_info_sh_name_code(symbol):
+        calls.append(symbol)
+        if symbol == "主板A股":
+            return pd.DataFrame(
+                [
+                    {
+                        "证券代码": "600000",
+                        "证券简称": "浦发银行",
+                        "证券全称": "上海浦东发展银行股份有限公司",
+                        "公司简称": "浦发银行",
+                        "公司全称": "上海浦东发展银行股份有限公司",
+                        "上市日期": pd.Timestamp("1999-11-10").date(),
+                    }
+                ]
+            )
+        return pd.DataFrame(
+            [
+                {
+                    "证券代码": "688001",
+                    "证券简称": "华兴源创",
+                    "证券全称": "苏州华兴源创科技股份有限公司",
+                    "公司简称": "华兴源创",
+                    "公司全称": "苏州华兴源创科技股份有限公司",
+                    "上市日期": pd.Timestamp("2019-07-22").date(),
+                }
+            ]
+        )
+
+    monkeypatch.setattr(market.ak, "stock_info_sh_name_code", stock_info_sh_name_code)
+
+    result = await market.get_stock_list(market="sh")
+
+    assert calls == ["主板A股", "科创板"]
+    assert result["market"] == "sh"
+    assert result["source"] == "akshare"
+    assert result["counts"] == {"sh": 2, "total": 2}
+    assert result["stocks"] == [
+        {"market": "SH", "code": "600000", "name": "浦发银行"},
+        {"market": "SH", "code": "688001", "name": "华兴源创"},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_get_stock_list_returns_sz_a_shares(monkeypatch):
+    monkeypatch.setattr(market, "RATE_LIMIT_DELAY", 0)
+
+    def stock_info_sz_name_code(symbol):
+        assert symbol == "A股列表"
+        return pd.DataFrame(
+            [
+                {
+                    "板块": "主板",
+                    "A股代码": "000001",
+                    "A股简称": "平安银行",
+                    "A股上市日期": "1991-04-03",
+                    "A股总股本": 19405918198,
+                    "A股流通股本": 19405754675,
+                    "所属行业": "金融业",
+                },
+                {
+                    "板块": "创业板",
+                    "A股代码": "300001",
+                    "A股简称": "特锐德",
+                    "A股上市日期": "2009-10-30",
+                    "A股总股本": 1058690071,
+                    "A股流通股本": 990175075,
+                    "所属行业": "制造业",
+                },
+            ]
+        )
+
+    monkeypatch.setattr(market.ak, "stock_info_sz_name_code", stock_info_sz_name_code)
+
+    result = await market.get_stock_list(market="sz")
+
+    assert result["counts"] == {"sz": 2, "total": 2}
+    assert result["stocks"] == [
+        {"market": "SZ", "code": "000001", "name": "平安银行"},
+        {"market": "SZ", "code": "300001", "name": "特锐德"},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_get_stock_list_returns_bj_stocks(monkeypatch):
+    monkeypatch.setattr(market, "RATE_LIMIT_DELAY", 0)
+    monkeypatch.setattr(
+        market.ak,
+        "stock_info_bj_name_code",
+        lambda: pd.DataFrame(
+            [
+                {
+                    "证券代码": "920002",
+                    "证券简称": "万达轴承",
+                    "总股本": 50000000,
+                    "流通股本": 25000000,
+                    "上市日期": pd.Timestamp("2024-05-30"),
+                    "所属行业": "制造业",
+                    "地区": "江苏",
+                    "报告日期": pd.Timestamp("2026-03-31"),
+                }
+            ]
+        ),
+    )
+
+    result = await market.get_stock_list(market="bj")
+
+    assert result["counts"] == {"bj": 1, "total": 1}
+    assert result["stocks"][0] == {
+        "market": "BJ",
+        "code": "920002",
+        "name": "万达轴承",
+    }
+
+
+@pytest.mark.asyncio
+async def test_get_stock_list_both_combines_supported_markets(monkeypatch):
+    monkeypatch.setattr(market, "RATE_LIMIT_DELAY", 0)
+
+    async def get_sh_stocks():
+        return [{"market": "SH", "code": "600000", "name": "浦发银行"}]
+
+    async def get_sz_stocks():
+        return [{"market": "SZ", "code": "000001", "name": "平安银行"}]
+
+    async def get_bj_stocks():
+        return [{"market": "BJ", "code": "920002", "name": "万达轴承"}]
+
+    monkeypatch.setattr(market, "_get_sh_stocks", get_sh_stocks)
+    monkeypatch.setattr(market, "_get_sz_stocks", get_sz_stocks)
+    monkeypatch.setattr(market, "_get_bj_stocks", get_bj_stocks)
+
+    result = await market.get_stock_list()
+
+    assert result["market"] == "both"
+    assert result["counts"] == {"sh": 1, "sz": 1, "bj": 1, "total": 3}
+    assert result["stocks"] == [
+        {"market": "SH", "code": "600000", "name": "浦发银行"},
+        {"market": "SZ", "code": "000001", "name": "平安银行"},
+        {"market": "BJ", "code": "920002", "name": "万达轴承"},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_get_stock_list_rejects_invalid_market():
+    with pytest.raises(ValueError, match="market must be"):
+        await market.get_stock_list(market="hk")
+
+
+@pytest.mark.asyncio
 async def test_get_limit_pool_returns_limit_up_and_down(monkeypatch):
     monkeypatch.setattr(market, "RATE_LIMIT_DELAY", 0)
     monkeypatch.setattr(

@@ -50,6 +50,8 @@ _LIMIT_DOWN_COLUMN_MAP = {
 
 _ST_PREFIXES = ("*ST", "ST", "S*ST", "SST", "NST", "N*ST")
 
+_STOCK_MARKETS = {"sh", "sz", "bj", "both"}
+
 
 def _default_trade_date() -> str:
     return datetime.now().strftime("%Y%m%d")
@@ -70,6 +72,60 @@ def _normalize_pool(df: pd.DataFrame, column_map: dict[str, str]) -> list[dict]:
     columns = [column for column in column_map.values() if column in normalized.columns]
     normalized = normalized[columns].astype(object).where(pd.notna(normalized), None)
     return normalized.to_dict(orient="records")
+
+
+def _normalize_stock_records(
+    df: pd.DataFrame, *, market: str, code_column: str, name_column: str
+) -> list[dict]:
+    if df.empty:
+        return []
+
+    records = []
+    for _, row in df.iterrows():
+        records.append(
+            {
+                "market": market,
+                "code": _code_key(row[code_column]),
+                "name": None if pd.isna(row[name_column]) else str(row[name_column]),
+            }
+        )
+    return records
+
+
+async def _get_sh_stocks() -> list[dict]:
+    records = []
+    for board in ("主板A股", "科创板"):
+        df = await asyncio.to_thread(ak.stock_info_sh_name_code, symbol=board)
+        records.extend(
+            _normalize_stock_records(
+                df,
+                market="SH",
+                code_column="证券代码",
+                name_column="证券简称",
+            )
+        )
+        await asyncio.sleep(RATE_LIMIT_DELAY)
+    return records
+
+
+async def _get_sz_stocks() -> list[dict]:
+    df = await asyncio.to_thread(ak.stock_info_sz_name_code, symbol="A股列表")
+    return _normalize_stock_records(
+        df,
+        market="SZ",
+        code_column="A股代码",
+        name_column="A股简称",
+    )
+
+
+async def _get_bj_stocks() -> list[dict]:
+    df = await asyncio.to_thread(ak.stock_info_bj_name_code)
+    return _normalize_stock_records(
+        df,
+        market="BJ",
+        code_column="证券代码",
+        name_column="证券简称",
+    )
 
 
 def _is_st_stock_name(name: object) -> bool:
@@ -139,6 +195,44 @@ async def get_market_index(index_code: str = "") -> dict:
         index_code: Index code, e.g. "sh000001" for SSE Composite. Empty returns all major indices.
     """
     ...
+
+
+@mcp.tool()
+async def get_stock_list(market: str = "both") -> dict:
+    """Get A-share stock list by market, excluding B-shares and other non-A-share lists.
+
+    Args:
+        market: Which market to return: "sh" for Shanghai main-board A-shares and STAR Market,
+            "sz" for Shenzhen A-shares including ChiNext, "bj" for Beijing Stock Exchange,
+            or "both" for all supported markets.
+    """
+    market = market.strip().lower()
+    if market not in _STOCK_MARKETS:
+        raise ValueError('market must be one of "sh", "sz", "bj", or "both"')
+
+    selected_markets = ("sh", "sz", "bj") if market == "both" else (market,)
+    result: dict = {
+        "market": market,
+        "source": "akshare",
+        "counts": {},
+        "stocks": [],
+    }
+
+    for selected_market in selected_markets:
+        if selected_market == "sh":
+            records = await _get_sh_stocks()
+        elif selected_market == "sz":
+            records = await _get_sz_stocks()
+        else:
+            records = await _get_bj_stocks()
+
+        result["counts"][selected_market] = len(records)
+        result["stocks"].extend(records)
+        if selected_market != selected_markets[-1]:
+            await asyncio.sleep(RATE_LIMIT_DELAY)
+
+    result["counts"]["total"] = len(result["stocks"])
+    return result
 
 
 @mcp.tool()
