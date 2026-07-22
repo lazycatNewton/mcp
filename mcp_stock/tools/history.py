@@ -1,48 +1,22 @@
 import asyncio
-import logging
 
-import akshare as ak
 import pandas as pd
+import tushare as ts
 
-from mcp_stock.config import RATE_LIMIT_DELAY
 from mcp_stock.server import mcp
-
-logger = logging.getLogger(__name__)
-
-_SZ_PREFIXES = ("000", "001", "002", "003", "300", "301")
-_SH_PREFIXES = ("600", "601", "603", "605", "688")
+from mcp_stock.tushare_client import get_pro_client, to_ts_code
 
 OUTPUT_COLUMNS = ["date", "open", "close", "high", "low", "volume", "amount"]
 
-# stock_zh_a_hist uses Chinese column names
 _HIST_COLUMN_MAP = {
-    "日期": "date",
-    "开盘": "open",
-    "收盘": "close",
-    "最高": "high",
-    "最低": "low",
-    "成交量": "volume",
-    "成交额": "amount",
-}
-
-# stock_zh_a_daily uses English column names
-_DAILY_COLUMN_MAP = {
-    "date": "date",
+    "trade_date": "date",
     "open": "open",
     "close": "close",
     "high": "high",
     "low": "low",
-    "volume": "volume",
+    "vol": "volume",
     "amount": "amount",
 }
-
-
-def _prefixed_symbol(symbol: str) -> str:
-    if symbol.startswith(_SZ_PREFIXES):
-        return f"sz{symbol}"
-    if symbol.startswith(_SH_PREFIXES):
-        return f"sh{symbol}"
-    return f"sz{symbol}"
 
 
 def _normalize(df: pd.DataFrame, column_map: dict) -> pd.DataFrame:
@@ -83,32 +57,24 @@ async def get_historical_data(
         period: Data frequency — "daily", "weekly", or "monthly".
         adjust: Price adjustment — "qfq" (前复权, default), "hfq" (后复权), or "" (不复权).
     """
-    # 1. Try eastmoney first (supports daily/weekly/monthly)
-    try:
-        df = await asyncio.to_thread(
-            ak.stock_zh_a_hist,
-            symbol=symbol,
-            period=period,
-            start_date=start_date,
-            end_date=end_date,
-            adjust=adjust,
-        )
-        df = _normalize(df, _HIST_COLUMN_MAP)
-        df = _filter_date(df, start_date, end_date)
-        await asyncio.sleep(RATE_LIMIT_DELAY)
-        return _to_records(df)
-    except Exception:
-        logger.warning(
-            "stock_zh_a_hist failed, falling back to stock_zh_a_daily (daily only)"
-        )
+    if period not in {"daily", "weekly", "monthly"}:
+        raise ValueError('period must be one of "daily", "weekly", or "monthly"')
+    if adjust not in {"qfq", "hfq", ""}:
+        raise ValueError('adjust must be one of "qfq", "hfq", or ""')
 
-    # 2. Fallback to sina (daily only)
+    frequency = {"daily": "D", "weekly": "W", "monthly": "M"}[period]
+    client = get_pro_client()
     df = await asyncio.to_thread(
-        ak.stock_zh_a_daily,
-        symbol=_prefixed_symbol(symbol),
-        adjust=adjust,
+        ts.pro_bar,
+        ts_code=to_ts_code(symbol),
+        api=client,
+        start_date=start_date,
+        end_date=end_date,
+        freq=frequency,
+        adj=adjust or None,
     )
-    df = _normalize(df, _DAILY_COLUMN_MAP)
+    if df is None:
+        return []
+    df = _normalize(df, _HIST_COLUMN_MAP)
     df = _filter_date(df, start_date, end_date)
-    await asyncio.sleep(RATE_LIMIT_DELAY)
     return _to_records(df)
