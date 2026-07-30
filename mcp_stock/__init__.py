@@ -1,0 +1,1 @@
+"""MCP stock server package."""

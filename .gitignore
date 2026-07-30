@@ -37,6 +37,12 @@ pip-log.txt
 pip-delete-this-directory.txt
 
 # Unit test / coverage reports
+## Local test code and fixtures
+mcp_test/
+**/tests/
+**/test_*.py
+**/*_test.py
+
 htmlcov/
 .tox/
 .nox/
