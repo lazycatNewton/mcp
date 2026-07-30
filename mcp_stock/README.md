@@ -63,7 +63,7 @@ python -m mcp_stock --transport streamable-http
 
 ## MCP Tools
 
-当前 MCP 仅注册以下三个已实现工具。
+当前 MCP 注册以下已实现工具。
 
 ### `get_historical_data`
 
@@ -111,3 +111,30 @@ Tushare 格式，例如 `000001` 转为 `000001.SZ`。
 `limit_up` / `limit_down` 数组。股票记录使用六位 `symbol`，并尽可能包含 `name`、
 `change_pct`、`latest_price`、成交额、市值、封单资金、连板数、行业等字段；每项均附带
 `is_st`、`is_new_stock`、`listing_date`。字段是否存在取决于 Tushare 当次返回的权限与数据。
+
+### `get_chip_performance`
+
+作用：查询单只 A 股每日的筹码成本分位、加权平均成本和获利比例。
+
+数据源：Tushare Pro `cyq_perf`。数据自 2018 年起，通常每日 18:00-19:00 更新，单次最多
+6000 条，需具备该接口权限的 `TUSHARE_TOKEN`。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `symbol` | str | - | A 股代码，例如 `"000001"` 或 `"600519"` |
+| `trade_date` | str | `""` | 交易日期，格式 `YYYYMMDD` |
+| `start_date` | str | `""` | 开始日期，格式 `YYYYMMDD` |
+| `end_date` | str | `""` | 结束日期，格式 `YYYYMMDD` |
+
+输出：`list[dict]`，每项包含 `date`、历史最高/最低价、5% 至 95% 成本分位、`weight_avg` 和
+`winner_rate`。
+
+### `get_chip_distribution`
+
+作用：查询单只 A 股每日按成本价格分层的筹码占比。
+
+数据源：Tushare Pro `cyq_chips`。数据自 2018 年起，通常每日 18:00-19:00 更新，单次最多
+6000 条，需具备该接口权限的 `TUSHARE_TOKEN`。
+
+参数与 `get_chip_performance` 相同。输出为 `list[dict]`，每项包含 `date`、`price`、`percent`。
+同一交易日会有多个成本价格档位，结果不会按日期合并或去重。

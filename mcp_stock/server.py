@@ -14,6 +14,7 @@ mcp = FastMCP(
 # isort: off
 # These imports must follow mcp construction so their decorators register on this instance.
 import mcp_stock.tools.history  # noqa: E402, F401  # isort: skip
+import mcp_stock.tools.chip  # noqa: E402, F401  # isort: skip
 import mcp_stock.tools.market  # noqa: E402, F401  # isort: skip
 # isort: on
 
