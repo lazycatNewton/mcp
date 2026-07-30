@@ -32,7 +32,7 @@ jobs:
       - run: python -m pip install --upgrade pip
       - run: python -m pip install .
       - run: python -m compileall -q .
-      - run: python -m mcp_stock --help >/dev/null
+      - run: PYTHONPATH=.. python -m mcp_stock --help >/dev/null
 
   publish:
     name: Build And Publish Image
