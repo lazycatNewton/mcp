@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "MCP server for stock market data"
 requires-python = ">=3.11"
 dependencies = [
-    "mcp>=1.0.0",
+    "mcp==1.28.1",
     "tushare>=1.4.29",
 ]
 

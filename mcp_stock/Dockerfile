@@ -12,7 +12,7 @@ RUN groupadd --system mcp && useradd --system --gid mcp --home-dir /app mcp
 
 COPY . /app/mcp_stock
 
-RUN pip install --no-cache-dir "mcp>=1.0.0" "tushare>=1.4.29" && \
+RUN pip install --no-cache-dir "mcp==1.28.1" "tushare>=1.4.29" && \
     chown -R mcp:mcp /app
 
 USER mcp
