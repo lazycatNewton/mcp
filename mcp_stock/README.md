@@ -95,6 +95,15 @@ Tushare 格式，例如 `000001` 转为 `000001.SZ`。
 输出：字典，包含请求的 `market`、`source: "tushare"`、分市场及总计的 `counts`，以及
 `stocks` 数组。每只股票包含 `market`（`SH`/`SZ`/`BJ`）、六位 `code` 和 `name`。
 
+### `get_sector_list`
+
+作用：获取同花顺全部行业和/或概念名称。
+
+数据源：Tushare Pro `ths_index`。参数 `sector` 可为 `N`（概念）、`I`（行业）或
+`both`（两者，默认值）；请求 `both` 时两个接口调用并发执行。
+
+输出：`list[dict]`，每项固定为 `{"name": "具体名称", "sector": "N" 或 "I"}`。
+
 ### `get_limit_pool`
 
 作用：按交易日查询 A 股涨停池、跌停池或两者，并补充 ST 和次新股标记。

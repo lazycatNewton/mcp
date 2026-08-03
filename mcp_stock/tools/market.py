@@ -15,7 +15,6 @@ _ST_PREFIXES = ("*ST", "ST", "S*ST", "SST", "NST", "N*ST")
 _STOCK_MARKETS = {"sh", "sz", "bj", "both"}
 _TUSHARE_EXCHANGES = {"sh": "SSE", "sz": "SZSE", "bj": "BSE"}
 _TUSHARE_MARKETS = {"SSE": "SH", "SZSE": "SZ", "BSE": "BJ"}
-
 _TUSHARE_LIMIT_UP_COLUMN_MAP = {
     "ts_code": "symbol",
     "name": "name",
@@ -100,6 +99,24 @@ async def _get_market_stocks(market: str) -> list[dict]:
         fields="ts_code,symbol,name,exchange",
     )
     return _normalize_stock_records(df)
+
+
+def _normalize_sector_records(df: pd.DataFrame, sector: str) -> list[dict]:
+    """Keep the stable, small response contract for THS index records."""
+    if df is None or df.empty or "name" not in df.columns:
+        return []
+
+    records = []
+    for name in df["name"]:
+        if pd.isna(name):
+            continue
+        records.append({"name": str(name), "sector": sector})
+    return records
+
+
+async def _get_sector_records(client, sector: str) -> list[dict]:
+    df = await asyncio.to_thread(client.ths_index, type=sector)
+    return _normalize_sector_records(df, sector)
 
 
 def _is_st_stock_name(name: object) -> bool:
@@ -188,6 +205,33 @@ async def get_stock_list(market: str = "both") -> dict:
 
     result["counts"]["total"] = len(result["stocks"])
     return result
+
+
+@mcp.tool()
+async def get_sector_list(sector: str = "both") -> list[dict]:
+    """Get all Tonghuashun industries and/or concepts from Tushare Pro ths_index.
+
+    Args:
+        sector: ``N`` for concepts, ``I`` for industries, or ``both`` for both.
+
+    Returns:
+        Records containing only ``name`` and ``sector`` (``N`` or ``I``).
+    """
+    normalized_sector = sector.strip().upper()
+    if normalized_sector not in {"N", "I", "BOTH"}:
+        raise ValueError('sector must be one of "N", "I", or "both"')
+
+    client = get_pro_client()
+    selected_types = ("N", "I") if normalized_sector == "BOTH" else (normalized_sector,)
+    if len(selected_types) == 1:
+        return await _get_sector_records(client, selected_types[0])
+
+    # Both requests are independent; issue them concurrently and combine in a
+    # deterministic N-then-I order regardless of completion order.
+    records = await asyncio.gather(
+        *(_get_sector_records(client, selected_type) for selected_type in selected_types)
+    )
+    return [record for records_for_type in records for record in records_for_type]
 
 
 @mcp.tool()
